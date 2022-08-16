@@ -37,17 +37,8 @@ typealias LumaListener = (luma: Double) -> Unit
 
 class MainActivity : AppCompatActivity() {
 
-    private lateinit var viewBinding: ActivityMainBinding
-
-    private lateinit var cameraExecutor: ExecutorService
-
-    private var imageCapture: ImageCapture? = null
-
-    private var recording: Recording? = null
-    private var videoCapture: VideoCapture<Recorder>? = null
-
     companion object {
-        private const val TAG = "CameraXApp"
+        private const val TAG = "CameraXPinchZoom"
         private const val FILENAME_FORMAT = "yyyy-MM-dd-HH-mm-ss-SSS"
         private const val REQUEST_CODE_PERMISSIONS = 10
         private val REQUIRED_PERMISSIONS =
@@ -61,59 +52,42 @@ class MainActivity : AppCompatActivity() {
             }.toTypedArray()
     }
 
-    //TODO TESTE
+    private lateinit var viewBinding: ActivityMainBinding
+
     private var camera: Camera? = null
+    private lateinit var cameraExecutor: ExecutorService
+
+    private var imageCapture: ImageCapture? = null
+    private var recording: Recording? = null
+
+    private var videoCapture: VideoCapture<Recorder>? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         viewBinding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(viewBinding.root)
 
-        // Request camera permissions
-        if (allPermissionsGranted()) {
-            startCamera()
-        } else {
-            ActivityCompat.requestPermissions(
-                this, REQUIRED_PERMISSIONS, REQUEST_CODE_PERMISSIONS
-            )
-        }
-
-        // Set up the listeners for take photo and video capture buttons
-        viewBinding.imageCaptureButton.setOnClickListener {
-            takePhoto()
-        }
-        viewBinding.videoCaptureButton.setOnClickListener {
-            captureVideo()
-        }
-
-        cameraExecutor = Executors.newSingleThreadExecutor()
-
-
-        //TODO TESTE
-        val scaleGestureDetector = ScaleGestureDetector(this,
-            object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
-                override fun onScale(detector: ScaleGestureDetector): Boolean {
-                    val camera = camera ?: return false
-                    val zoomState = camera.cameraInfo.zoomState.value ?: return false
-                    val scale = zoomState.zoomRatio * detector.scaleFactor
-                    val finalScale =
-                        scale.coerceIn(0f, 200f).coerceIn(zoomState.minZoomRatio, zoomState.maxZoomRatio)
-                    camera.cameraControl.setZoomRatio(finalScale)
-                    return true
-                }
-            })
-
-        //TODO TESTE
-        viewBinding.viewFinder.setOnTouchListener { view, event ->
-            view.performClick()
-            scaleGestureDetector.onTouchEvent(event)
-            return@setOnTouchListener true
-        }
+        init()
+        initListeners()
+        pinchToZoomCamera()
     }
 
     override fun onDestroy() {
         super.onDestroy()
         cameraExecutor.shutdown()
+    }
+
+    private fun init() {
+        if (allPermissionsGranted()) {
+            startCamera()
+        } else {
+            ActivityCompat.requestPermissions(this, REQUIRED_PERMISSIONS, REQUEST_CODE_PERMISSIONS)
+        }
+        cameraExecutor = Executors.newSingleThreadExecutor()
+    }
+
+    private fun allPermissionsGranted() = REQUIRED_PERMISSIONS.all {
+        ContextCompat.checkSelfPermission(baseContext, it) == PackageManager.PERMISSION_GRANTED
     }
 
     override fun onRequestPermissionsResult(
@@ -132,12 +106,8 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun allPermissionsGranted() =
-        REQUIRED_PERMISSIONS.all {
-            ContextCompat.checkSelfPermission(baseContext, it) == PackageManager.PERMISSION_GRANTED
-        }
-
     private fun startCamera() {
+
         val cameraProviderFuture = ProcessCameraProvider.getInstance(this)
 
         cameraProviderFuture.addListener(Runnable {
@@ -187,16 +157,28 @@ class MainActivity : AppCompatActivity() {
 //                cameraProvider.bindToLifecycle(this, cameraSelector, preview, imageCapture, imageAnalyzer)
 //                cameraProvider.bindToLifecycle(this, cameraSelector, preview, imageCapture, videoCapture)
 
-                //TODO TESTE
-                camera = cameraProvider.bindToLifecycle(this, cameraSelector, preview, imageCapture, videoCapture)
-
+                camera = cameraProvider.bindToLifecycle(
+                    this, cameraSelector, preview, imageCapture, videoCapture
+                )
             } catch (exc: Exception) {
                 Log.e(TAG, "Use case binding failed", exc)
             }
         }, ContextCompat.getMainExecutor(this))
     }
 
+    private fun initListeners() {
+
+        viewBinding.imageCaptureButton.setOnClickListener {
+            takePhoto()
+        }
+
+        viewBinding.videoCaptureButton.setOnClickListener {
+            captureVideo()
+        }
+    }
+
     private fun takePhoto() {
+
         // Get a stable reference of the modifiable image capture use case
         val imageCapture = imageCapture ?: return
 
@@ -221,8 +203,7 @@ class MainActivity : AppCompatActivity() {
                 )
                 .build()
 
-        // Set up image capture listener, which is triggered after photo has
-        // been taken
+        // Set up image capture listener, which is triggered after photo has been taken
         imageCapture.takePicture(
             outputOptions,
             ContextCompat.getMainExecutor(this),
@@ -240,8 +221,8 @@ class MainActivity : AppCompatActivity() {
         )
     }
 
-    // Implements VideoCapture use case, including start and stop capturing.
     private fun captureVideo() {
+
         val videoCapture = this.videoCapture ?: return
 
         viewBinding.videoCaptureButton.isEnabled = false
@@ -308,6 +289,28 @@ class MainActivity : AppCompatActivity() {
                         }
                     }
                 }
+    }
+
+    private fun pinchToZoomCamera() {
+
+        val scaleGestureDetector = ScaleGestureDetector(this,
+            object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
+                override fun onScale(detector: ScaleGestureDetector): Boolean {
+                    val camera = camera ?: return false
+                    val zoomState = camera.cameraInfo.zoomState.value ?: return false
+                    val scale = zoomState.zoomRatio * detector.scaleFactor
+                    val finalScale =
+                        scale.coerceIn(0f, 200f).coerceIn(zoomState.minZoomRatio, zoomState.maxZoomRatio)
+                    camera.cameraControl.setZoomRatio(finalScale)
+                    return true
+                }
+            })
+
+        viewBinding.viewFinder.setOnTouchListener { view, event ->
+            view.performClick()
+            scaleGestureDetector.onTouchEvent(event)
+            return@setOnTouchListener true
+        }
     }
 
     private class LuminosityAnalyzer(private val listener: LumaListener) : ImageAnalysis.Analyzer {

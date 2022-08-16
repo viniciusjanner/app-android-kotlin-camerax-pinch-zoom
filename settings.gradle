@@ -14,5 +14,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "Cam Pinch Zoom"
+rootProject.name = "CameraX Pinch Zoom"
 include ':app'

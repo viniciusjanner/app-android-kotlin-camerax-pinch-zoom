@@ -299,11 +299,7 @@ class MainActivity : AppCompatActivity() {
                     val camera = camera ?: return false
                     val zoomState = camera.cameraInfo.zoomState.value ?: return false
                     val scale = zoomState.zoomRatio * detector.scaleFactor
-                    val minPinchZoom = 0f
-                    val maxPinchZoom = 200f
-                    val finalScale = scale
-                        .coerceIn(minPinchZoom, maxPinchZoom)
-                        .coerceIn(zoomState.minZoomRatio, zoomState.maxZoomRatio)
+                    val finalScale = scale.coerceIn(zoomState.minZoomRatio, zoomState.maxZoomRatio)
                     camera.cameraControl.setZoomRatio(finalScale)
                     return true
                 }

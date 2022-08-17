@@ -1,37 +1,34 @@
 package com.viniciusjanner.app.camerax.pinch.zoom
 
+import android.Manifest
 import android.content.ContentValues
 import android.content.pm.PackageManager
-import android.Manifest
 import android.os.Build
 import android.os.Bundle
 import android.provider.MediaStore
 import android.util.Log
 import android.view.ScaleGestureDetector
+import android.view.ScaleGestureDetector.SimpleOnScaleGestureListener
+import android.widget.SeekBar
 import android.widget.Toast
 
 import androidx.appcompat.app.AppCompatActivity
+import androidx.camera.core.*
 import androidx.camera.lifecycle.ProcessCameraProvider
-import androidx.camera.video.Recorder
-import androidx.camera.video.Recording
+import androidx.camera.video.*
 import androidx.camera.video.VideoCapture
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
-import androidx.camera.core.*
-import androidx.camera.video.FallbackStrategy
-import androidx.camera.video.MediaStoreOutputOptions
-import androidx.camera.video.Quality
-import androidx.camera.video.QualitySelector
-import androidx.camera.video.VideoRecordEvent
 import androidx.core.content.PermissionChecker
+import androidx.lifecycle.LiveData
 
 import com.viniciusjanner.app.camerax.pinch.zoom.databinding.ActivityMainBinding
 
 import java.nio.ByteBuffer
 import java.text.SimpleDateFormat
-import java.util.concurrent.Executors
+import java.util.*
 import java.util.concurrent.ExecutorService
-import java.util.Locale
+import java.util.concurrent.Executors
 
 typealias LumaListener = (luma: Double) -> Unit
 
@@ -69,7 +66,7 @@ class MainActivity : AppCompatActivity() {
 
         init()
         initListeners()
-        pinchToZoomCamera()
+        pinchToZoomCameraX()
     }
 
     override fun onDestroy() {
@@ -78,11 +75,19 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun init() {
+
+        // SeekBar
+        viewBinding.zoomSeekBar.max = 100
+        viewBinding.zoomSeekBar.progress = 0
+
+        // Permissions
         if (allPermissionsGranted()) {
             startCamera()
         } else {
             ActivityCompat.requestPermissions(this, REQUIRED_PERMISSIONS, REQUEST_CODE_PERMISSIONS)
         }
+
+        // ExecutorService
         cameraExecutor = Executors.newSingleThreadExecutor()
     }
 
@@ -136,16 +141,16 @@ class MainActivity : AppCompatActivity() {
             // ImageCapture
             imageCapture = ImageCapture.Builder().build()
 
-            // ImageAnalysis
-//            val imageAnalyzer =
-//                ImageAnalysis.Builder()
-//                    .build()
-//                    .also {
-//                        it.setAnalyzer(cameraExecutor, LuminosityAnalyzer { luma ->
-//                            Log.d(TAG, "Average luminosity: $luma")
-//                        })
-//                    }
-
+            // ImageAnalysis (do not use imageAnalyzer with videoCapture)
+            /*val imageAnalyzer =
+                ImageAnalysis.Builder()
+                    .build()
+                    .also {
+                        it.setAnalyzer(cameraExecutor, LuminosityAnalyzer { luma ->
+                            Log.d(TAG, "Average luminosity: $luma")
+                        })
+                    }
+            */
             // Select back camera as a default
             val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
 
@@ -154,12 +159,8 @@ class MainActivity : AppCompatActivity() {
                 cameraProvider.unbindAll()
 
                 // Bind use cases to camera
-//                cameraProvider.bindToLifecycle(this, cameraSelector, preview, imageCapture, imageAnalyzer)
-//                cameraProvider.bindToLifecycle(this, cameraSelector, preview, imageCapture, videoCapture)
-
-                camera = cameraProvider.bindToLifecycle(
-                    this, cameraSelector, preview, imageCapture, videoCapture
-                )
+                //camera = cameraProvider.bindToLifecycle(this, cameraSelector, preview, imageCapture, imageAnalyzer)//Do not use imageAnalyzer with videoCapture
+                camera = cameraProvider.bindToLifecycle(this, cameraSelector, preview, imageCapture, videoCapture)
             } catch (exc: Exception) {
                 Log.e(TAG, "Use case binding failed", exc)
             }
@@ -291,25 +292,62 @@ class MainActivity : AppCompatActivity() {
                 }
     }
 
-    private fun pinchToZoomCamera() {
+    private fun pinchToZoomCameraX() {
 
-        val scaleGestureDetector = ScaleGestureDetector(this,
-            object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
+        val listener: SimpleOnScaleGestureListener =
+            object : SimpleOnScaleGestureListener() {
                 override fun onScale(detector: ScaleGestureDetector): Boolean {
-                    val camera = camera ?: return false
-                    val zoomState = camera.cameraInfo.zoomState.value ?: return false
-                    val scale = zoomState.zoomRatio * detector.scaleFactor
-                    val finalScale = scale.coerceIn(zoomState.minZoomRatio, zoomState.maxZoomRatio)
-                    camera.cameraControl.setZoomRatio(finalScale)
-                    return true
+                    try {
+                        val camera: Camera = camera ?: return false
+                        val zoomState: LiveData<ZoomState> = camera.cameraInfo.zoomState
+
+                        var currentZoomRatio: Float = 0f
+                        currentZoomRatio = zoomState.value!!.zoomRatio
+
+                        val delta: Float = detector.scaleFactor
+                        camera.cameraControl.setZoomRatio(currentZoomRatio * delta)
+
+                        val linearValue: Float = zoomState.value!!.linearZoom
+                        val mat: Float = linearValue * 100
+
+                        // Update SeekBar
+                        viewBinding.zoomSeekBar.progress = mat.toInt()
+                        Log.i(TAG, "onScale: SeekBar progress = ${mat.toInt()}")
+
+                        return true
+                    } catch (e: Exception) {
+                        Log.e(TAG, "onScale: Exception = ${e.message}")
+                        return false
+                    }
                 }
-            })
+            }
+
+        val scaleGestureDetector = ScaleGestureDetector(baseContext, listener)
 
         viewBinding.viewFinder.setOnTouchListener { view, event ->
             view.performClick()
             scaleGestureDetector.onTouchEvent(event)
             return@setOnTouchListener true
         }
+
+        viewBinding.zoomSeekBar.setOnSeekBarChangeListener(
+            object : SeekBar.OnSeekBarChangeListener {
+                override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
+                    if (!fromUser) {
+                        Log.i(TAG, "onProgressChanged: fromUser = $fromUser")
+                        return
+                    }
+                    val percentage: Float = progress / 100F
+                    camera!!.cameraControl.setLinearZoom(percentage)
+                    Log.i(TAG, "onProgressChanged: progress   = $progress ")
+                    Log.i(TAG, "onProgressChanged: percentage = $percentage ")
+                }
+
+                override fun onStartTrackingTouch(seekBar: SeekBar?) {}
+
+                override fun onStopTrackingTouch(seekBar: SeekBar?) {}
+            }
+        )
     }
 
     private class LuminosityAnalyzer(private val listener: LumaListener) : ImageAnalysis.Analyzer {

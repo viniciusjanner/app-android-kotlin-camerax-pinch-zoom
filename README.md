@@ -17,3 +17,5 @@ https://stackoverflow.com/questions/58591560/does-camerax-allow-pinch-zoom
 https://github.com/tciles/android-camerax/blob/master/app/src/main/java/fr/thomasciles/camerax/MainActivity.kt
 
 https://github.com/Pinkal7600/camera-samples
+
+

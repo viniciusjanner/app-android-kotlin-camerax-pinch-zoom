@@ -6,7 +6,7 @@
     <!--
     Adicionar android.hardware.camera.any garante que o dispositivo tenha uma câmera.
     Especificar .any significa que pode ser uma câmera frontal ou uma câmera traseira.
-    Se você usar android.hardware.camerasem .any, não funcionará se tiver um dispositivo sem câmera traseira,
+    Se você usar android.hardware.camera sem .any, não funcionará se tiver um dispositivo sem câmera traseira,
     como a maioria dos Chromebooks.
     -->
     <uses-feature android:name="android.hardware.camera.any" />

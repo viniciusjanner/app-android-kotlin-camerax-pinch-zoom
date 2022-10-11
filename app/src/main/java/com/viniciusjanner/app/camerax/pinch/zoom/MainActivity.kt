@@ -30,14 +30,17 @@ import java.util.*
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
-typealias LumaListener = (luma: Double) -> Unit
+typealias LuminosityListener = (luma: Double) -> Unit
 
 class MainActivity : AppCompatActivity() {
 
     companion object {
         private const val TAG = "CameraXPinchZoom"
+
         private const val FILENAME_FORMAT = "yyyy-MM-dd-HH-mm-ss-SSS"
+
         private const val REQUEST_CODE_PERMISSIONS = 10
+
         private val REQUIRED_PERMISSIONS =
             mutableListOf(
                 Manifest.permission.CAMERA,
@@ -49,7 +52,7 @@ class MainActivity : AppCompatActivity() {
             }.toTypedArray()
     }
 
-    private lateinit var viewBinding: ActivityMainBinding
+    private lateinit var binding: ActivityMainBinding
 
     private var camera: Camera? = null
     private lateinit var cameraExecutor: ExecutorService
@@ -61,8 +64,8 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        viewBinding = ActivityMainBinding.inflate(layoutInflater)
-        setContentView(viewBinding.root)
+        binding = ActivityMainBinding.inflate(layoutInflater)
+        setContentView(binding.root)
 
         init()
         initListeners()
@@ -77,8 +80,8 @@ class MainActivity : AppCompatActivity() {
     private fun init() {
 
         // SeekBar
-        viewBinding.zoomSeekBar.max = 100
-        viewBinding.zoomSeekBar.progress = 0
+        binding.zoomSeekBar.max = 100
+        binding.zoomSeekBar.progress = 0
 
         // Permissions
         if (allPermissionsGranted()) {
@@ -124,7 +127,7 @@ class MainActivity : AppCompatActivity() {
                 .Builder()
                 .build()
                 .also {
-                    it.setSurfaceProvider(viewBinding.viewFinder.surfaceProvider)
+                    it.setSurfaceProvider(binding.viewFinder.surfaceProvider)
                 }
 
             // VideoCapture
@@ -169,11 +172,11 @@ class MainActivity : AppCompatActivity() {
 
     private fun initListeners() {
 
-        viewBinding.imageCaptureButton.setOnClickListener {
+        binding.imageCaptureButton.setOnClickListener {
             takePhoto()
         }
 
-        viewBinding.videoCaptureButton.setOnClickListener {
+        binding.videoCaptureButton.setOnClickListener {
             captureVideo()
         }
     }
@@ -226,7 +229,7 @@ class MainActivity : AppCompatActivity() {
 
         val videoCapture = this.videoCapture ?: return
 
-        viewBinding.videoCaptureButton.isEnabled = false
+        binding.videoCaptureButton.isEnabled = false
 
         val curRecording = recording
         if (curRecording != null) {
@@ -268,7 +271,7 @@ class MainActivity : AppCompatActivity() {
                 .start(ContextCompat.getMainExecutor(this)) { recordEvent ->
                     when (recordEvent) {
                         is VideoRecordEvent.Start -> {
-                            viewBinding.videoCaptureButton.apply {
+                            binding.videoCaptureButton.apply {
                                 text = getString(R.string.stop_capture)
                                 isEnabled = true
                             }
@@ -283,7 +286,7 @@ class MainActivity : AppCompatActivity() {
                                 recording = null
                                 Log.e(TAG, "Video capture ends with error: ${recordEvent.error}")
                             }
-                            viewBinding.videoCaptureButton.apply {
+                            binding.videoCaptureButton.apply {
                                 text = getString(R.string.start_capture)
                                 isEnabled = true
                             }
@@ -311,7 +314,7 @@ class MainActivity : AppCompatActivity() {
                         val mat: Float = linearValue * 100
 
                         // Update SeekBar
-                        viewBinding.zoomSeekBar.progress = mat.toInt()
+                        binding.zoomSeekBar.progress = mat.toInt()
                         Log.i(TAG, "onScale: SeekBar progress = ${mat.toInt()}")
 
                         return true
@@ -324,13 +327,13 @@ class MainActivity : AppCompatActivity() {
 
         val scaleGestureDetector = ScaleGestureDetector(baseContext, listener)
 
-        viewBinding.viewFinder.setOnTouchListener { view, event ->
+        binding.viewFinder.setOnTouchListener { view, event ->
             view.performClick()
             scaleGestureDetector.onTouchEvent(event)
             return@setOnTouchListener true
         }
 
-        viewBinding.zoomSeekBar.setOnSeekBarChangeListener(
+        binding.zoomSeekBar.setOnSeekBarChangeListener(
             object : SeekBar.OnSeekBarChangeListener {
                 override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
                     if (!fromUser) {
@@ -350,7 +353,7 @@ class MainActivity : AppCompatActivity() {
         )
     }
 
-    private class LuminosityAnalyzer(private val listener: LumaListener) : ImageAnalysis.Analyzer {
+    private class LuminosityAnalyzer(private val listener: LuminosityListener) : ImageAnalysis.Analyzer {
 
         private fun ByteBuffer.toByteArray(): ByteArray {
             rewind()    // Rewind the buffer to zero
